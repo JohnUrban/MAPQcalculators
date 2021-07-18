@@ -1,4 +1,9 @@
-> MAPQ calculators
+MAPQ calculators
+================
+
+
+Bowtie2 MAPQ calculations
+-------------------------
 
 This specifically has python code to reproduce MAPQ calculations from bowtie2 as a supplement to my blog posts on how Bowtie2 computes MAPQ:
 - How does bowtie2 assign MAPQ scores? (May 2014)
