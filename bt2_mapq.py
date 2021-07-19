@@ -105,6 +105,7 @@ args = parser.parse_args()
 ################################################################
 
 def endtoend_MAPQ(AS, XS, scMin, diff, bestOver, bestdiff):
+    #print(AS, XS, scMin, diff, bestOver, bestdiff)
     ## If does not have second best
     if XS < scMin: ## if only single alignment (no XS)
         if bestOver >= diff*0.8:
@@ -115,7 +116,7 @@ def endtoend_MAPQ(AS, XS, scMin, diff, bestOver, bestdiff):
             return 24
         elif bestOver >= diff*0.5:
             return 23
-        elif bestOver >= diff*0.42: ## originally >= 0.40 but this made it agree with my bt2 tests better
+        elif bestOver >= diff*0.4: ## originally >= 0.40 but this made it agree with my bt2 tests better
             return 8
         elif bestOver >= diff*0.3:
             return 3
@@ -132,7 +133,7 @@ def endtoend_MAPQ(AS, XS, scMin, diff, bestOver, bestdiff):
                 return 38
             else:
                 return 27
-        elif bestdiff >= diff*0.97:
+        elif bestdiff >= diff*0.7:
             if bestOver == diff:
                 return 37
             else:
@@ -149,7 +150,8 @@ def endtoend_MAPQ(AS, XS, scMin, diff, bestOver, bestdiff):
                 return 25
             elif bestOver >= diff*0.68:
                 return 16
-            elif bestOver >= diff*0.68:
+            else:
+            #elif bestOver >= diff*0.68:
                 return 5
         elif bestdiff >= diff*0.4:
             if bestOver == diff:
@@ -300,7 +302,7 @@ def bt2_mapq(AS, XS=None, alnmode=None, scMin=None, scPer=None):
 
 
     ## Absolute difference between the best and second best alignment scores (usually AS>XS)
-    if AS > XS:
+    if AS >= XS:
         bestdiff = abs(abs(AS)-abs(XS)) ## gives diff in AS between best and 2nd best -- biggest diff after both AS and XS seen
     else:
         bestdiff = 1 ## seems like 0 or negative would be better, but so far this has minimized discrepancies
