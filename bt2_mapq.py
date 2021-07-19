@@ -84,7 +84,7 @@ Description:
 
 ''', formatter_class=argparse.RawDescriptionHelpFormatter)
 parser.add_argument("-AS", "--AS", type=int, default=None, help='''Alignment score.''')
-parser.add_argument("-XS", "--XS", type=str, default=None, help='''Alignment score of next best alignment -- needs to be the same or lower than AS. Do not use if no XS given. Or use "-1" or "None".''')
+parser.add_argument("-XS", "--XS", type=str, default=None, help='''Alignment score of next best alignment -- needs to be the same or lower than AS. Do not use if no XS given. Or use "None".''')
 parser.add_argument("-f", "--table", type=str, default=None, help='''Path to table file with AS and XS columns''')
 parser.add_argument("-ASC", "--AScolumn", type=int, default=None, help='''1-based Column to find AS in if table file given.''')
 parser.add_argument("-XSC", "--XScolumn", type=int, default=None, help='''1-based Column to find XS in if table file given.''')
@@ -331,7 +331,7 @@ def getscoremin(fxn, readlength):
     return fd[l[0]](float(l[1]), float(l[2]), int(readlength))
 
 def run_simple(args, alnmode, scoremin, scoreperfect):
-    args.XS = None if args.XS in (None, "None", -1) else int(args.XS)
+    args.XS = None if args.XS in (None, "None") else int(args.XS)
     mapq = bt2_mapq(
                     AS=args.AS,
                     XS=args.XS,
@@ -368,7 +368,7 @@ def run_table(args, alnmode, scoremin, scoreperfect):
         for row in table:
             row = row.strip().split()
             AS = float(row[asc])
-            XS = None if row[xsc] in (None, "None", -1, "-1") else float(row[xsc])
+            XS = None if row[xsc] in (None, "None") else float(row[xsc])
             row += ["MAPQ"]
             mapq1 = bt2_mapq(
                     AS=AS,
@@ -379,7 +379,7 @@ def run_table(args, alnmode, scoremin, scoreperfect):
             row += [mapq1]
             if paired:
                 AS2 = float(row[asc2])
-                XS2 = None if row[xsc2] in (None, "None", -1, "-1") else float(row[xsc2])
+                XS2 = None if row[xsc2] in (None, "None") else float(row[xsc2])
                 mapq2 = bt2_mapq(
                     AS=AS2,
                     XS=XS2,
@@ -393,24 +393,7 @@ def run_table(args, alnmode, scoremin, scoreperfect):
                 ## JOINT1
                 ASJ = AS + AS2
 
-                ## all below give same result; combining 1 with if statements does a little better...
-                #1 XSJ = None if (XS is None and XS2 is None) else ((XS if XS is not None else 0) + (XS2 if XS2 is not None else 0))
-                #2 XSJ = None if (XS is None and XS2 is None) else ((XS if XS is not None else scoremin-1) + (XS2 if XS2 is not None else scoremin-1))
-                #3 XSJ = (scoremin-1)*2 if (XS is None and XS2 is None) else ((XS if XS is not None else scoremin-1) + (XS2 if XS2 is not None else scoremin-1))
-                #4 XSJ = (scoremin-1)*2 if (XS is None and XS2 is None) else ((XS if XS is not None else scoremin) + (XS2 if XS2 is not None else scoremin))
-
-
-                ## combining 1 with if statements does a little better
-                #XSJ = None if (XS is None and XS2 is None) else ((XS if XS is not None else 0) + (XS2 if XS2 is not None else 0))
-                #if XSJ is not None:
-                #    if XSJ == XS:
-                #        XSJ = XS + max(AS, AS2) 
-                #    elif XSJ == XS2:
-                #        XSJ = XS2 + max(AS, AS2) 
-                #if XSJ is None:
-                #    XSJ = (scoremin-1) * 2
-
-                ##Below is similar to the above code, but the more-sane human readable syntax allowed me to optimize a bit further
+                ## XS HANDLING
                 if XS is not None and XS2 is None:
                     ##XSJ = XS + max(AS, AS2)
                     XSJ = XS + AS2
@@ -425,9 +408,9 @@ def run_table(args, alnmode, scoremin, scoreperfect):
                     XSJ = XS + XS2
                     ## XSJ = max(XS, XS2)*2 ; when the above fails to give correct pair mapq, this at least sometimes solves it
 
-                # The pair XS sometimes exceeds the pair of AS, but very rarely, and correcting for it did not further optimize
-                #if XSJ > ASJ:
-                #    XSJ = ASJ
+                # The pair XS sometimes exceeds the pair of AS, but very rarely. Correcting for it helped a little in end-to-end analysis; saw no change in one local analysis (C-40-0).
+                if XSJ > ASJ:
+                    XSJ = ASJ
 
 
                 mapqJ1 = bt2_mapq(
@@ -439,51 +422,53 @@ def run_table(args, alnmode, scoremin, scoreperfect):
                     )
                 row += [mapqJ1]
 
-##                ## JOINT2
-##                ASJ = 0.5*sum([AS,AS2])
-##                XSJ = None if (XS is None and XS2 is None) else 0.5*((XS if XS is not None else 0) + (XS2 if XS2 is not None else 0))
-##                mapqJ2 = bt2_mapq(
-##                    AS=ASJ,
-##                    XS=XSJ,
-##                    alnmode=alnmode,
-##                    scMin = scoremin,
-##                    scPer = scoreperfect)
-##                row += [mapqJ2]
-##
-##                ## JOINT3
-##                ASJ = np.sqrt(AS * AS)
-##                XSJ = None if (XS is None and XS2 is None) else np.sqrt((XS if XS is not None else 1) * (XS2 if XS2 is not None else 1))
-##                mapqJ3 = bt2_mapq(
-##                    AS=ASJ,
-##                    XS=XSJ,
-##                    alnmode=alnmode,
-##                    scMin = scoremin,
-##                    scPer = scoreperfect)
-##                row += [mapqJ3]
-##
-##                ## JOINT4
-##                mapqJ4 = round(0.5*((0 if mapq1 is None else mapq1) + (0 if mapq2 is None else mapq2)))
-##                row += [mapqJ4]
-##
-##                ## JOINT5
-##                mapqJ5 = round(np.sqrt((1 if mapq1 is None else mapq1)*(1 if mapq2 is None else mapq2)))
-##                row += [mapqJ5]
-##
-##                ## JOINT6
-##                ASJ = AS + AS2
-##                XSJ = None if (XS is None and XS2 is None) else ((XS if XS is not None else 0) + (XS2 if XS2 is not None else 0))
-##                mapqJ1 = bt2_mapq(
-##                    AS=ASJ,
-##                    XS=XSJ,
-##                    alnmode=alnmode,
-##                    scMin = scoremin,
-##                    scPer = scoreperfect)
-##                row += [mapqJ1]
-##
-##                ## JOINT5
-##                mapqJ5 = round(np.log(
-##                    np.exp((0 if mapq1 is None else mapq1) + (0 if mapq2 is None else mapq2))))
-##                row += [mapqJ5]
+
+
+                ## JOINT2
+
+                mapqJ2 = None
+                ## XS HANDLING
+                if XS is not None and XS2 is None: #mate2 has no other mappings
+                    ##XSJ = XS + max(AS, AS2)
+                    XSJ = XS + AS2
+                    #mapqJ2 = AS2
+                    ASJ = AS
+                    XSJ = XS
+                    scale = 1
+                    
+                elif XS is None and XS2 is not None:
+                    ##XSJ = XS2 + max(AS, AS2)
+                    XSJ = AS + XS2
+                    #mapqJ2 = AS
+                    ASJ = AS2
+                    XSJ = XS2
+                    scale = 1
+                elif XS is None and XS2 is None:
+                    XSJ = (scoremin-1) * 2 ## This can simply be scoremin and still work....at least in localmode C,40,0
+                    # XSJ = min(AS, AS2) * 2            ....no
+                    # XSJ = min(AS, AS2) + scoremin-1    ....no
+                    ASJ = AS + AS2
+                    scale = 2
+                else: ## neither none
+                    XSJ = XS + XS2
+                    ## XSJ = max(XS, XS2)*2 ; when the above fails to give correct pair mapq, this at least sometimes solves it
+                    ASJ = AS + AS2
+                    scale = 2
+                # The pair XS sometimes exceeds the pair of AS, but very rarely. Correcting for it helped a little in end-to-end analysis; saw no change in one local analysis (C-40-0).
+                if XSJ > ASJ:
+                    XSJ = ASJ
+
+
+                if True:
+                    mapqJ2 = bt2_mapq(
+                        AS=ASJ,
+                        XS=XSJ,
+                        alnmode=alnmode,
+                        scMin = scoremin * scale,
+                        scPer = scoreperfect * scale
+                        )
+                row += [mapqJ2]
+
 
             out += '\t'.join(str(e) for e in row) + '\n'
     sys.stdout.write( out )
@@ -541,3 +526,82 @@ def run(args):
 ################################################################
 run(args)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### OTHER THINGS TRIED FOR JOINT/PAIRED MAPQ
+                ## all below give same result; combining 1 with if statements does a little better...
+                #1 XSJ = None if (XS is None and XS2 is None) else ((XS if XS is not None else 0) + (XS2 if XS2 is not None else 0))
+                #2 XSJ = None if (XS is None and XS2 is None) else ((XS if XS is not None else scoremin-1) + (XS2 if XS2 is not None else scoremin-1))
+                #3 XSJ = (scoremin-1)*2 if (XS is None and XS2 is None) else ((XS if XS is not None else scoremin-1) + (XS2 if XS2 is not None else scoremin-1))
+                #4 XSJ = (scoremin-1)*2 if (XS is None and XS2 is None) else ((XS if XS is not None else scoremin) + (XS2 if XS2 is not None else scoremin))
+
+
+                ## combining 1 with if statements does a little better
+                #XSJ = None if (XS is None and XS2 is None) else ((XS if XS is not None else 0) + (XS2 if XS2 is not None else 0))
+                #if XSJ is not None:
+                #    if XSJ == XS:
+                #        XSJ = XS + max(AS, AS2) 
+                #    elif XSJ == XS2:
+                #        XSJ = XS2 + max(AS, AS2) 
+                #if XSJ is None:
+                #    XSJ = (scoremin-1) * 2
+
+##                ## JOINT2
+##                ASJ = 0.5*sum([AS,AS2])
+##                XSJ = None if (XS is None and XS2 is None) else 0.5*((XS if XS is not None else 0) + (XS2 if XS2 is not None else 0))
+##                mapqJ2 = bt2_mapq(
+##                    AS=ASJ,
+##                    XS=XSJ,
+##                    alnmode=alnmode,
+##                    scMin = scoremin,
+##                    scPer = scoreperfect)
+##                row += [mapqJ2]
+##
+##                ## JOINT3
+##                ASJ = np.sqrt(AS * AS)
+##                XSJ = None if (XS is None and XS2 is None) else np.sqrt((XS if XS is not None else 1) * (XS2 if XS2 is not None else 1))
+##                mapqJ3 = bt2_mapq(
+##                    AS=ASJ,
+##                    XS=XSJ,
+##                    alnmode=alnmode,
+##                    scMin = scoremin,
+##                    scPer = scoreperfect)
+##                row += [mapqJ3]
+##
+##                ## JOINT4
+##                mapqJ4 = round(0.5*((0 if mapq1 is None else mapq1) + (0 if mapq2 is None else mapq2)))
+##                row += [mapqJ4]
+##
+##                ## JOINT5
+##                mapqJ5 = round(np.sqrt((1 if mapq1 is None else mapq1)*(1 if mapq2 is None else mapq2)))
+##                row += [mapqJ5]
+##
+##                ## JOINT6
+##                ASJ = AS + AS2
+##                XSJ = None if (XS is None and XS2 is None) else ((XS if XS is not None else 0) + (XS2 if XS2 is not None else 0))
+##                mapqJ1 = bt2_mapq(
+##                    AS=ASJ,
+##                    XS=XSJ,
+##                    alnmode=alnmode,
+##                    scMin = scoremin,
+##                    scPer = scoreperfect)
+##                row += [mapqJ1]
+##
+##                ## JOINT5
+##                mapqJ5 = round(np.log(
+##                    np.exp((0 if mapq1 is None else mapq1) + (0 if mapq2 is None else mapq2))))
+##                row += [mapqJ5]
